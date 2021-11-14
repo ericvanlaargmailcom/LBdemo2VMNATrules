@@ -1,5 +1,5 @@
 {
-  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json",
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
     "storageAccountName": {
@@ -20,7 +20,7 @@
         "description": "Admin password"
       }
     },
-    "dnsNameforLBIP": {
+    "dnsLabelPrefix": {
       "type": "string",
       "metadata": {
         "description": "DNS for Load Balancer IP"
@@ -28,7 +28,7 @@
     },
     "vmNamePrefix": {
       "type": "string",
-      "defaultValue": "myVM",
+      "defaultValue": "lbVM",
       "metadata": {
         "description": "Prefix to use for VM names"
       }
@@ -70,14 +70,14 @@
     },
     "publicIPAddressName": {
       "type": "string",
-      "defaultValue": "myPublicIP",
+      "defaultValue": "lbPublicIP",
       "metadata": {
         "description": "Public IP Name"
       }
     },
     "vnetName": {
       "type": "string",
-      "defaultValue": "myVNET",
+      "defaultValue": "lbVNET",
       "metadata": {
         "description": "VNET name"
       }
@@ -92,7 +92,7 @@
   },
   "variables": {
     "storageAccountType": "Standard_LRS",
-    "availabilitySetName": "myAvSet",
+    "availabilitySetName": "lbAvSet",
     "addressPrefix": "10.0.0.0/16",
     "subnetName": "Subnet-1",
     "subnetPrefix": "10.0.0.0/24",
@@ -134,7 +134,7 @@
       "properties": {
         "publicIPAllocationMethod": "[variables('publicIPAddressType')]",
         "dnsSettings": {
-          "domainNameLabel": "[parameters('dnsNameforLBIP')]"
+          "domainNameLabel": "[parameters('dnsLabelPrefix')]"
         }
       }
     },
