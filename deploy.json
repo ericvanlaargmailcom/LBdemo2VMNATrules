@@ -49,7 +49,7 @@
     },
     "imageSKU": {
       "type": "string",
-      "defaultValue": "2016-Datacenter",
+      "defaultValue": "2022-datacenter",
       "metadata": {
         "description": "Image SKU"
       }
