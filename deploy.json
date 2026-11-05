@@ -84,9 +84,15 @@
     },
     "vmSize": {
       "type": "string",
-      "defaultValue": "Standard_D2_v2",
+      "defaultValue": "Standard_D2s_v5",
       "metadata": {
         "description": "Size of the VM"
+      }
+    },
+    "rdpSourceAddressPrefix": {
+      "type": "string",
+      "metadata": {
+        "description": "Public client IPv4 address/CIDR allowed to connect via RDP (use /32 for one client)."
       }
     }
   },
@@ -96,38 +102,47 @@
     "addressPrefix": "10.0.0.0/16",
     "subnetName": "Subnet-1",
     "subnetPrefix": "10.0.0.0/24",
-    "publicIPAddressType": "Dynamic",
+    "publicIPAddressType": "Static",
     "subnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), variables ('subnetName'))]",
     "publicIPAddressID": "[resourceId('Microsoft.Network/publicIPAddresses',parameters('publicIPAddressName'))]",
     "numberOfInstances": 2,
     "lbID": "[resourceId('Microsoft.Network/loadBalancers',parameters('lbName'))]",
     "frontEndIPConfigID": "[concat(variables('lbID'),'/frontendIPConfigurations/LoadBalancerFrontEnd')]",
     "lbPoolID": "[concat(variables('lbID'),'/backendAddressPools/BackendPool1')]",
-    "lbProbeID": "[concat(variables('lbID'),'/probes/tcpProbe')]"
+    "lbProbeID": "[concat(variables('lbID'),'/probes/tcpProbe')]",
+    "nsgName": "lbNSG"
   },
   "resources": [
     {
       "type": "Microsoft.Storage/storageAccounts",
       "name": "[parameters('storageAccountName')]",
-      "apiVersion": "2015-05-01-preview",
+      "apiVersion": "2023-05-01",
       "location": "[resourceGroup().location]",
       "properties": {
-        "accountType": "[variables('storageAccountType')]"
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false
+      },
+      "kind": "StorageV2",
+      "sku": {
+        "name": "[variables('storageAccountType')]"
       }
     },
     {
       "type": "Microsoft.Compute/availabilitySets",
       "name": "[variables('availabilitySetName')]",
-      "apiVersion": "2016-04-30-preview",
+      "apiVersion": "2023-09-01",
       "location": "[resourceGroup().location]",
       "properties": {
         "platformFaultDomainCount": 2,
-        "platformUpdateDomainCount": 2,
-        "managed": true
+        "platformUpdateDomainCount": 2
+      },
+      "sku": {
+        "name": "Aligned"
       }
     },
     {
-      "apiVersion": "2015-05-01-preview",
+      "apiVersion": "2023-11-01",
       "type": "Microsoft.Network/publicIPAddresses",
       "name": "[parameters('publicIPAddressName')]",
       "location": "[resourceGroup().location]",
@@ -136,10 +151,14 @@
         "dnsSettings": {
           "domainNameLabel": "[parameters('dnsLabelPrefix')]"
         }
+      },
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
       }
     },
     {
-      "apiVersion": "2015-05-01-preview",
+      "apiVersion": "2023-11-01",
       "type": "Microsoft.Network/virtualNetworks",
       "name": "[parameters('vnetName')]",
       "location": "[resourceGroup().location]",
@@ -153,14 +172,20 @@
           {
             "name": "[variables('subnetName')]",
             "properties": {
-              "addressPrefix": "[variables('subnetPrefix')]"
+              "addressPrefix": "[variables('subnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+              }
             }
           }
         ]
-      }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+      ]
     },
     {
-      "apiVersion": "2015-05-01-preview",
+      "apiVersion": "2023-11-01",
       "type": "Microsoft.Network/networkInterfaces",
       "name": "[concat(parameters('nicNamePrefix'), copyindex())]",
       "location": "[resourceGroup().location]",
@@ -197,7 +222,7 @@
       }
     },
     {
-      "apiVersion": "2015-05-01-preview",
+      "apiVersion": "2023-11-01",
       "name": "[parameters('lbName')]",
       "type": "Microsoft.Network/loadBalancers",
       "location": "[resourceGroup().location]",
@@ -263,7 +288,8 @@
               "idleTimeoutInMinutes": 5,
               "probe": {
                 "id": "[variables('lbProbeID')]"
-              }
+              },
+              "disableOutboundSnat": true
             }
           }
         ],
@@ -277,11 +303,34 @@
               "numberOfProbes": 2
             }
           }
+        ],
+        "outboundRules": [
+          {
+            "name": "OutboundInternet",
+            "properties": {
+              "allocatedOutboundPorts": 1024,
+              "protocol": "All",
+              "idleTimeoutInMinutes": 4,
+              "enableTcpReset": true,
+              "backendAddressPool": {
+                "id": "[variables('lbPoolID')]"
+              },
+              "frontendIPConfigurations": [
+                {
+                  "id": "[variables('frontEndIPConfigID')]"
+                }
+              ]
+            }
+          }
         ]
+      },
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
       }
     },
     {
-      "apiVersion": "2016-04-30-preview",
+      "apiVersion": "2023-09-01",
       "type": "Microsoft.Compute/virtualMachines",
       "name": "[concat(parameters('vmNamePrefix'), copyindex())]",
       "copy": {
@@ -314,7 +363,10 @@
             "version": "latest"
           },
           "osDisk": {
-            "createOption": "FromImage"
+            "createOption": "FromImage",
+            "managedDisk": {
+              "storageAccountType": "StandardSSD_LRS"
+            }
           }
         },
         "networkProfile": {
@@ -327,10 +379,56 @@
         "diagnosticsProfile": {
           "bootDiagnostics": {
             "enabled": true,
-            "storageUri": "[concat('http://',parameters('storageAccountName'),'.blob.core.windows.net')]"
+            "storageUri": "[concat('https://',parameters('storageAccountName'),'.blob.core.windows.net/')]"
           }
         }
       }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2023-11-01",
+      "name": "[variables('nsgName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "AllowHttp",
+            "properties": {
+              "priority": 100,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "80",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*"
+            }
+          },
+          {
+            "name": "AllowRdpFromClient",
+            "properties": {
+              "priority": 110,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('rdpSourceAddressPrefix')]",
+              "destinationAddressPrefix": "*"
+            }
+          }
+        ]
+      }
     }
-  ]
+  ],
+  "outputs": {
+    "publicIPAddress": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddressName')), '2023-11-01').ipAddress]"
+    },
+    "dnsName": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddressName')), '2023-11-01').dnsSettings.fqdn]"
+    }
+  }
 }

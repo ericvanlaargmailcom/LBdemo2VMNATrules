@@ -1,0 +1,26 @@
+{
+  "region": "belgiumcentral",
+  "subscription": "MSDN Platforms Subscription",
+  "resourceGroup": "rg-loadbal-demo-belgiumcentral-001",
+  "deployment": "lb-demo-belgiumcentral-test",
+  "deploymentState": "Succeeded",
+  "vmSize": "Standard_D2s_v5",
+  "publicIP": "9.160.161.89",
+  "httpRequests": 24,
+  "httpStatuses": {
+    "200": 24
+  },
+  "backendResponses": {
+    "lbVM1": 12,
+    "lbVM0": 12
+  },
+  "rdp": {
+    "50001": "RDP handshake succeeded",
+    "50002": "RDP handshake succeeded"
+  },
+  "rdpSource": "84.86.240.241/32",
+  "limitations": [
+    "RDP protocol handshake tested; interactive Windows login not tested.",
+    "No failover or load/performance test performed."
+  ]
+}

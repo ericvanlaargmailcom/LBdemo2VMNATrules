@@ -1,17 +1,24 @@
-#$msdnsub = "9c108632-3066-4862-b0db-b34e82ba633d"
-$rg = "rg-loadbal-demo-westeurope-001"
-$location = "westeurope"
+[CmdletBinding()]
+param(
+    [string]$SubscriptionId = "ef17a603-a390-49bd-946c-cc18aa67f388",
+    [string]$ResourceGroupName = "rg-loadbal-demo-belgiumcentral-001",
+    [string]$Location = "belgiumcentral",
+    [switch]$ValidateOnly
+)
 
-#Set-AzContext -Subscription $msdnsub
+$ErrorActionPreference = "Stop"
+Set-AzContext -SubscriptionId $SubscriptionId | Out-Null
+New-AzResourceGroup -Name $ResourceGroupName -Location $Location | Out-Null
 
-New-AzResourceGroup -Name $rg -Location $location -verbose
+$deployment = @{
+    ResourceGroupName = $ResourceGroupName
+    TemplateFile = Join-Path $PSScriptRoot "deploy.json"
+    TemplateParameterFile = Join-Path $PSScriptRoot "deployparam.json"
+    adminPassword = Read-Host "VM administrator password" -AsSecureString
+}
 
-New-AzResourceGroupDeployment `
--ResourceGroupName $rg `
--TemplateURI ./deploy.json `
--TemplateParameterFile ./deployparam.json `
--Verbose
-
-#read-host "Press enter to cleanup the demo"
-#Remove-AzResourceGroup -Name NetworkWatcherRG -Force -verbose
-#Remove-AzResourceGroup -Name $rg -Force -verbose
+if ($ValidateOnly) {
+    Test-AzResourceGroupDeployment @deployment
+} else {
+    New-AzResourceGroupDeployment @deployment -Verbose
+}
